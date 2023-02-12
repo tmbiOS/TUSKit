@@ -122,4 +122,8 @@ extension SceneDelegate: TUSClientDelegate {
         print("TUSClient File error \(error)")
     }
     
+    func didCreateUpload(id: UUID, url: URL, client: TUSClient) {
+        print(url)
+        client.scheduleTaskWithRemoteUrl(url: url)
+    }
 }

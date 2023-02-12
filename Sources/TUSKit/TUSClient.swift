@@ -34,6 +34,9 @@ public protocol TUSClientDelegate: AnyObject {
     @available(iOS 11.0, macOS 10.13, *)
     /// Get the progress of a specific upload by id. The id is given when adding an upload and methods of this delegate.
     func progressFor(id: UUID, context: [String: String]?, bytesUploaded: Int, totalBytes: Int, client: TUSClient)
+    
+    /// TUSClient  created an upload
+    func didCreateUpload(id: UUID, url: URL, client: TUSClient)
 }
 
 public extension TUSClientDelegate {
@@ -149,6 +152,21 @@ public final class TUSClient {
         uploads = [:]
     }
     
+    /// Check which uploads aren't finished. Load them from a store and turn these into tasks.
+    public func scheduleTaskWithRemoteUrl(url: URL) {
+        do {
+            if let metaDataItem = try files.loadAllMetadata().first (where: { metaData in
+                // Only allow uploads where errors are below an amount
+                metaData.errorCount <= retryCount && !metaData.isFinished &&  metaData.remoteDestination == url
+            }) {
+                try scheduleTask(for: metaDataItem)
+            }
+        } catch (let error) {
+            let tusError = TUSClientError.couldNotLoadData(underlyingError: error)
+            delegate?.fileError(error: tusError, client: self)
+        }
+    }
+    
     // MARK: - Upload single file
     
     /// Upload data located at a url.  This file will be copied to a TUS directory for processing..
@@ -177,7 +195,7 @@ public final class TUSClient {
         }
     }
     
-    /// Upload data
+    /// Create Upload
     /// - Parameters:
     ///   - data: The data to be upload
     ///   - preferredFileExtension: A file extension to add when saving the file. E.g. You can add ".JPG" to raw data that's being saved. This will help the uploader's metadata.
@@ -188,10 +206,10 @@ public final class TUSClient {
     /// - Returns: An identifier.
     /// - Throws: TUSClientError
     @discardableResult
-    public func upload(data: Data, preferredFileExtension: String? = nil, uploadURL: URL? = nil, customHeaders: [String: String] = [:], context: [String: String]? = nil) throws -> UUID {
+    public func createUpload(data: Data, preferredFileExtension: String? = nil, uploadURL: URL? = nil, customHeaders: [String: String] = [:], context: [String: String]? = nil, uuid: String? = nil) throws -> UUID {
         didStopAndCancel = false
         do {
-            let id = UUID()
+            let id = uuid == nil ? UUID(): UUID(uuidString: uuid!)!
             let filePath = try files.store(data: data, id: id, preferredFileExtension: preferredFileExtension)
             try scheduleTask(for: filePath, id: id, uploadURL: uploadURL, customHeaders: customHeaders, context: context)
             return id
@@ -233,7 +251,7 @@ public final class TUSClient {
     @discardableResult
     public func uploadMultiple(dataFiles: [Data], preferredFileExtension: String? = nil, uploadURL: URL? = nil, customHeaders: [String: String] = [:], context: [String: String]? = nil) throws -> [UUID] {
         try dataFiles.map { data in
-            try upload(data: data, preferredFileExtension: preferredFileExtension, uploadURL: uploadURL, customHeaders: customHeaders, context: context)
+            try createUpload(data: data, preferredFileExtension: preferredFileExtension, uploadURL: uploadURL, customHeaders: customHeaders, context: context)
         }
     }
     
@@ -441,6 +459,9 @@ extension TUSClient: SchedulerDelegate {
     
     func handleCreationTask(_ creationTask: CreationTask) {
         creationTask.metaData.errorCount = 0
+        if let url = creationTask.metaData.remoteDestination {
+            delegate?.didCreateUpload(id: creationTask.metaData.id, url: url, client: self)
+        }
     }
     
     func handleFinishedStatusTask(_ statusTask: StatusTask) {

@@ -113,14 +113,16 @@ final class Scheduler {
                     
                     switch result {
                     case .success(let newTasks):
-                        if !newTasks.isEmpty {
+                        if !(task is CreationTask), !newTasks.isEmpty {
                             self.pendingTasks = newTasks + self.pendingTasks // If there are new tasks, perform them first. E.g. After creation of a file, start uploading.
                         }
                         self.delegate?.didFinishTask(task: task, scheduler: self)
                     case .failure(let error):
                         self.delegate?.onError(error: error, task: task, scheduler: self)
                     }
-                    self.checkProcessNextTask()
+                    if !(task is CreationTask) {
+                        self.checkProcessNextTask()
+                    }
                 }
                     
             }
