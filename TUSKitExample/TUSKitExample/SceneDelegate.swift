@@ -14,14 +14,15 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     var window: UIWindow?
 
     var tusClient: TUSClient!
+    var wrapper: TUSWrapper!
 
     @State var isPresented = false
     
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         
         do {
-            tusClient = try TUSClient(server: URL(string: "https://tusd.tusdemo.net/files")!, sessionIdentifier: "TUS DEMO", storageDirectory: URL(string: "/TUS")!)
-            tusClient.delegate = self
+            tusClient = try TUSClient(server: URL(string: "https://tusd.tusdemo.net/files")!, sessionIdentifier: "TUS DEMO", storageDirectory: URL(string: "/TUS")!, chunkSize: 100 * 1024 * 1024)
+            wrapper = TUSWrapper(client: tusClient)
             let remainingUploads = tusClient.start()
             switch remainingUploads.count {
             case 0:
@@ -45,9 +46,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             assertionFailure("Could not fetch failed id's from disk, or could not instantiate TUSClient \(error)")
         }
         
-        let photoPicker = PhotoPicker(tusClient: tusClient)
-        
-        let contentView = ContentView(photoPicker: photoPicker)
+        let contentView = ContentView(tusWrapper: wrapper)
 
         // Use a UIHostingController as window root view controller.
         if let windowScene = scene as? UIWindowScene {
