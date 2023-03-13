@@ -9,10 +9,11 @@ import Foundation
 import TUSKit
 
 enum UploadStatus {
+    case createdUpload(url: URL)
     case paused(bytesUploaded: Int, totalBytes: Int)
     case uploading(bytesUploaded: Int, totalBytes: Int)
-    case failed(error: Error)
-    case uploaded(url: URL)
+    case failed(error: Error, client: TUSClient)
+    case uploaded(url: URL, client: TUSClient)
 }
 
 class TUSWrapper: TUSClientDelegate, ObservableObject {
@@ -66,18 +67,22 @@ class TUSWrapper: TUSClientDelegate, ObservableObject {
     
     func didFinishUpload(id: UUID, url: URL, context: [String : String]?, client: TUSClient) {
         Task { @MainActor in
-            uploads[id] = .uploaded(url: url)
+            uploads[id] = .uploaded(url: url, client: client)
         }
     }
     
     func uploadFailed(id: UUID, error: Error, context: [String : String]?, client: TUSClient) {
         Task { @MainActor in
-            uploads[id] = .failed(error: error)
+            uploads[id] = .failed(error: error, client: client)
         }
     }
     
     func fileError(error: TUSClientError, client: TUSClient) { }
     func totalProgress(bytesUploaded: Int, totalBytes: Int, client: TUSClient) { }
     
-    func didCreateUpload(id: UUID, url: URL, client: TUSKit.TUSClient) { }
+    func didCreateUpload(id: UUID, url: URL, client: TUSClient) {
+        Task { @MainActor in
+            uploads[id] = .createdUpload(url: url)
+        }
+    }
 }

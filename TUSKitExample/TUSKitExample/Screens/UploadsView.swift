@@ -71,6 +71,19 @@ struct UploadsView: View {
                             
                             Spacer()
                         }
+                    case .createdUpload:
+                        
+                        HStack(spacing: 8) {
+                            Button(action: {
+                                tusWrapper.client.start()
+                            }, label: {
+                                Image(systemName: "play.fill")
+                            })
+                            
+                            Text("Item \(idx.key) - Has been created")
+                            
+                            Spacer()
+                        }
                     }
                 }
             }.padding([.leading, .trailing])
